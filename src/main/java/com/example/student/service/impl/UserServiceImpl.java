@@ -77,9 +77,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse updateUser(UserRequest userRequest) {
         User existedUser = findByEmail(userRequest.getEmail());
-        existedUser.setEmail(userRequest.getEmail());
-        existedUser.setRoles(userRequest.getRoles());
-        return null;
+        if (userRequest.getRoles() != null && !userRequest.getRoles().isEmpty()) {
+            existedUser.setRoles(userRequest.getRoles());
+        }
+        return userMapper.toResponse(existedUser);
     }
 
     @Override

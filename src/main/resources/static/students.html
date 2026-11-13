@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Студенты</title>
+    <style>
+        body { font-family: sans-serif; margin: 24px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+        .pager { margin: 12px 0; }
+        .pager button { margin-right: 4px; padding: 4px 10px; cursor: pointer; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; }
+        #error { color: red; margin: 8px 0; }
+    </style>
+</head>
+<body>
+<div class="top-bar">
+    <h1>Студенты</h1>
+    <div>
+        <button id="addBtn" style="display:none" onclick="addStudent()">Добавить</button>
+        <button id="usersBtn" style="display:none" onclick="window.location.href='/users.html'">Пользователи</button>
+        <button onclick="logout()">Выйти</button>
+    </div>
+</div>
+
+<div id="error"></div>
+
+<table id="studentsTable">
+    <thead>
+    <tr><th>ID</th><th>Имя</th><th>Фамилия</th><th></th></tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<div class="pager" id="pager"></div>
+
+<script>
+    const token = localStorage.getItem('jwt');
+
+    // ---- Защитный разбор ролей ----
+    // roles в localStorage может быть массивом, строкой или отсутствовать,
+    // а с бэкенда роли могут прийти с префиксом ROLE_ или без него.
+    let roleList = [];
+    try {
+        const raw = JSON.parse(localStorage.getItem('roles') || '[]');
+        roleList = Array.isArray(raw) ? raw : [String(raw)];
+    } catch (e) {
+        roleList = [];
+    }
+    const normalizedRoles = roleList.map(r => String(r).replace(/^ROLE_/, ''));
+    const isAdmin = normalizedRoles.includes('ADMIN');
+    const isSuperAdmin = normalizedRoles.includes('SUPER_ADMIN');
+    // --------------------------------
+
+    const PAGE_SIZE = 10;
+
+    let allStudents = [];
+    let page = 0;
+
+    // Нет токена — на логин
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
+    if (isAdmin) {
+        document.getElementById('addBtn').style.display = 'inline-block';
+    }
+    if (isSuperAdmin) {
+        document.getElementById('usersBtn').style.display = 'inline-block';
+    }
+
+    async function loadStudents() {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = '';
+
+        try {
+            const response = await fetch('/api/v1/student', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.status === 401) {
+                // Токен протух или отсутствует — на логин
+                logout();
+                return;
+            }
+            if (response.status === 403) {
+                // Прав не хватает — показываем сообщение, не выкидываем
+                errorDiv.textContent = 'Недостаточно прав для просмотра списка студентов';
+                return;
+            }
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки: ' + response.status);
+            }
+
+            const data = await response.json();
+            allStudents = data.response || [];
+            page = 0;
+            render();
+        } catch (ex) {
+            errorDiv.textContent = ex.message;
+        }
+    }
+
+    function render() {
+        const tbody = document.querySelector('#studentsTable tbody');
+        tbody.innerHTML = '';
+
+        const start = page * PAGE_SIZE;
+        const pageItems = allStudents.slice(start, start + PAGE_SIZE);
+
+        for (const s of pageItems) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${s.id}</td>
+                <td>${s.name}</td>
+                <td>${s.surname}</td>
+                <td>${isAdmin ? `<button onclick="deleteStudent(${s.id})">Удалить</button>` : ''}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        renderPager();
+    }
+
+    function renderPager() {
+        const pager = document.getElementById('pager');
+        pager.innerHTML = '';
+        const pages = Math.max(1, Math.ceil(allStudents.length / PAGE_SIZE));
+
+        for (let i = 0; i < pages; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = (i + 1);
+            btn.disabled = i === page;
+            btn.onclick = () => { page = i; render(); };
+            pager.appendChild(btn);
+        }
+    }
+
+    async function deleteStudent(id) {
+        if (!confirm('Удалить студента ' + id + '?')) return;
+
+        const response = await fetch('/api/v1/student/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!response.ok) {
+            document.getElementById('error').textContent = 'Не удалось удалить: ' + response.status;
+            return;
+        }
+        loadStudents();
+    }
+
+    async function addStudent() {
+        const name = prompt('Имя:');
+        const surname = prompt('Фамилия:');
+        if (!name || !surname) return;
+
+        const response = await fetch('/api/v1/student/save', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: name, surname: surname })
+        });
+
+        if (!response.ok) {
+            document.getElementById('error').textContent = 'Не удалось создать: ' + response.status;
+            return;
+        }
+        loadStudents();
+    }
+
+    function logout() {
+        localStorage.removeItem('jwt');
+        localStorage.removeItem('roles');
+        window.location.href = '/login.html';
+    }
+
+    loadStudents();
+</script>
+</body>
+</html>

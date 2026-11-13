@@ -10,6 +10,7 @@ import java.util.List;
 
 @Component
 public class UserMapperImpl implements UserMapper {
+
     @Override
     public UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getEmail(), user.getRoles());
@@ -24,12 +25,14 @@ public class UserMapperImpl implements UserMapper {
         return user;
     }
 
+    @Override
     public List<UserResponse> toResponseList(List<User> users) {
         return users.stream()
                 .map(this::toResponse)
                 .toList();
     }
 
+    @Override
     public UserResponseList toListResponse(List<User> users) {
         List<UserResponse> responses = toResponseList(users);
         return new UserResponseList(responses, responses.size());

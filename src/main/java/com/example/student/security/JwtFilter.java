@@ -46,7 +46,7 @@ public class JwtFilter extends OncePerRequestFilter {
                     response.getWriter().write("{\"error\": \"" + ex.getClass().getSimpleName() + ": " + ex.getMessage() + "\"}");
                     return;
                 } else {
-                    throw ex;
+                    filterChain.doFilter(request, response);
                 }
             }
         }

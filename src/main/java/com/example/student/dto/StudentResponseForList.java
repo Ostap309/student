@@ -1,12 +1,12 @@
 package com.example.student.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Setter
+@Getter
 public class StudentResponseForList {
     private long id;
     private String name;

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Вход</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; margin-top: 80px; }
+        form { border: 1px solid #ddd; border-radius: 8px; padding: 24px; width: 300px; }
+        input { display: block; width: 100%; margin-bottom: 12px; padding: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 8px; cursor: pointer; }
+        #error { color: red; margin-top: 8px; }
+    </style>
+</head>
+<body>
+<form id="loginForm">
+    <h2>Вход</h2>
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Пароль" required>
+    <button type="submit">Войти</button>
+    <div id="error"></div>
+</form>
+
+<script>
+    // Если токен уже есть — сразу на таблицу, логиниться второй раз незачем
+    if (localStorage.getItem('jwt')) {
+        window.location.href = '/students.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); // не даем форме перезагрузить страницу
+
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = '';
+
+        try {
+            const response = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                })
+            });
+
+            if (!response.ok) {
+                // Сервер вернул ошибку: 401 при неверных данных и т.п.
+                const err = await response.json().catch(() => null);
+                throw new Error(err ? err.message : 'Ошибка входа: ' + response.status);
+            }
+
+            const data = await response.json();
+            localStorage.setItem('jwt', data.token);
+            localStorage.setItem('roles', JSON.stringify(data.roles));
+
+            window.location.href = '/students.html';
+        } catch (ex) {
+            errorDiv.textContent = ex.message;
+        }
+    });
+</script>
+</body>
+</html>

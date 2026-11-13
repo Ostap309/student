@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Пользователи</title>
+    <style>
+        body { font-family: sans-serif; margin: 24px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; }
+        #error { color: red; margin: 8px 0; }
+        button { padding: 4px 10px; cursor: pointer; margin-right: 4px; }
+        input, select { display: block; margin-bottom: 8px; padding: 6px; }
+    </style>
+</head>
+<body>
+<div class="top-bar">
+    <h1>Пользователи</h1>
+    <div>
+        <button onclick="window.location.href='/students.html'">К студентам</button>
+        <button onclick="logout()">Выйти</button>
+    </div>
+</div>
+
+<div id="error"></div>
+
+<button onclick="showAddForm()">Добавить пользователя</button>
+
+<table id="usersTable">
+    <thead>
+    <tr><th>ID</th><th>Email</th><th>Роли</th><th></th></tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<div id="addForm" style="display:none; margin-top: 12px;">
+    <input type="email" id="newEmail" placeholder="Email">
+    <input type="password" id="newPassword" placeholder="Пароль">
+    <select id="newRole">
+        <option value="ADMIN">ADMIN</option>
+        <option value="TEACHER">TEACHER</option>
+        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+    </select>
+    <button onclick="saveUser()">Сохранить</button>
+    <button onclick="hideAddForm()">Отмена</button>
+</div>
+
+<script>
+    const token = localStorage.getItem('jwt');
+
+    let roleList = [];
+    try {
+        const raw = JSON.parse(localStorage.getItem('roles') || '[]');
+        roleList = Array.isArray(raw) ? raw : [String(raw)];
+    } catch (e) {
+        roleList = [];
+    }
+    const normalizedRoles = roleList.map(r => String(r).replace(/^ROLE_/, ''));
+
+    // Страница только для суперадмина
+    if (!normalizedRoles.includes('SUPER_ADMIN')) {
+        window.location.href = '/login.html';
+    }
+
+    async function loadUsers() {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = '';
+
+        try {
+            const response = await fetch('/api/v1/users', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.status === 401) {
+                logout();
+                return;
+            }
+            if (response.status === 403) {
+                errorDiv.textContent = 'Недостаточно прав';
+                return;
+            }
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки: ' + response.status);
+            }
+
+            const data = await response.json();
+            render(data.responses || []);
+        } catch (ex) {
+            errorDiv.textContent = ex.message;
+        }
+    }
+
+    function render(users) {
+        const tbody = document.querySelector('#usersTable tbody');
+        tbody.innerHTML = '';
+
+        for (const u of users) {
+            const tr = document.createElement('tr');
+            // roles на карточке пользователя — массив строк
+            tr.innerHTML = `
+                <td>${u.id}</td>
+                <td>${u.email}</td>
+                <td>${(u.roles || []).map(r => String(r).replace(/^ROLE_/, '')).join(', ')}</td>
+                <td>
+                    <button onclick="deleteUser(${u.id})">Удалить</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    async function saveUser() {
+        const errorDiv = document.getElementById('error');
+        const email = document.getElementById('newEmail').value;
+        const password = document.getElementById('newPassword').value;
+        const role = document.getElementById('newRole').value;
+
+        if (!email || !password) {
+            errorDiv.textContent = 'Заполните email и пароль';
+            return;
+        }
+
+        const response = await fetch('/api/v1/users/save', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: email, password: password, roles: [role] })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => null);
+            errorDiv.textContent = err ? err.message : 'Не удалось создать: ' + response.status;
+            return;
+        }
+
+        hideAddForm();
+        loadUsers();
+    }
+
+    async function deleteUser(id) {
+        if (!confirm('Удалить пользователя ' + id + '?')) return;
+
+        const response = await fetch('/api/v1/users/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!response.ok) {
+            document.getElementById('error').textContent = 'Не удалось удалить: ' + response.status;
+            return;
+        }
+        loadUsers();
+    }
+
+    function showAddForm() {
+        document.getElementById('addForm').style.display = 'block';
+    }
+    function hideAddForm() {
+        document.getElementById('addForm').style.display = 'none';
+    }
+
+    function logout() {
+        localStorage.removeItem('jwt');
+        localStorage.removeItem('roles');
+        window.location.href = '/login.html';
+    }
+
+    loadUsers();
+</script>
+</body>
+</html>

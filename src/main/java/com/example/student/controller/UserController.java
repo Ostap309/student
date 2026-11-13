@@ -23,7 +23,7 @@ public class UserController {
         return userService.findAll();
     }
 
-    @PutMapping("/{id}")
+    @PutMapping
     public UserResponse updateUser(@RequestBody UserRequest userRequest) {
         return userService.updateUser(userRequest);
     }
