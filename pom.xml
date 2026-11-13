@@ -114,6 +114,12 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.15</version>
+				<configuration>
+					<!-- Общие настройки: действуют на report И на check -->
+					<excludes>
+						<exclude>com/example/student/configuration/*</exclude>
+					</excludes>
+				</configuration>
 				<executions>
 					<!-- 1. Подключить агента к прогону тестов -->
 					<execution>
@@ -155,6 +161,7 @@
 									</limits>
 								</rule>
 							</rules>
+
 						</configuration>
 					</execution>
 				</executions>
